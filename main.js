@@ -15,7 +15,7 @@ import StealthPlugin  from 'puppeteer-extra-plugin-stealth'
 puppeteer.use(StealthPlugin())
 
 import path from 'path';
-import fs, { cp } from 'fs'
+import fs from 'fs'
 import yaml from 'js-yaml'
 
 import fetch from 'node-fetch';
@@ -24,19 +24,17 @@ import { dirname } from 'path';
 import { NONAME } from "dns";
 
 import authorize from './yt_oauth2.js';
-import { GaxiosError } from 'gaxios';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const settings = {
-    recordVideoFolder: path.join(__dirname, "records"),
     
     blank_profile: process.argv.includes("--blank_profile"), // Starts from a blank and temporary profile 
     login: process.argv.includes("--login"),
     fetch: process.argv.includes("--fetch"),
     savecache: process.argv.includes("--savecache"),
-    public: process.argv.includes("--public"),
+    private: process.argv.includes("--private"),
     visible: process.argv.includes("--visible"),
     loadcache: process.argv.includes("--loadcache"),
     reupload: process.argv.includes("--reupload"),
@@ -49,7 +47,7 @@ function saveSettings()
 
     const settingsFile = path.join(__dirname,"settings.yaml");
     const doc= yaml.dump(settings.persistent);
-    fs.writeFileSync(settingsFile)
+    fs.writeFileSync(settingsFile,doc)
     console.log("Saved settings");
 }
 function loadpersistent()
@@ -105,8 +103,6 @@ const browser = await puppeteer.launch(launchArgs);
 
 function clickByContent(content,items)
 {
-
-        
     function htmlDecode(input) {
         return input.replace("&amp;","&")
     }
@@ -150,12 +146,6 @@ async function login()
     console.log("Logged in");
 }
 
-async function scrollPage(page)
-{
-    await page.evaluate(_ => {
-        window.scrollBy(0, window.innerHeight);
-      });
-}
 
 async function complete_posts(posts,page,cursor)
 {
@@ -243,7 +233,6 @@ function savePostsToCache(posts)
 {
     let data = JSON.stringify(posts);
     fs.writeFileSync('postsCache.json', data);
-    
     console.log("Cached",posts.length,"posts to cache")
 }
 
@@ -265,7 +254,6 @@ function stopBeforePreviousUpload(posts){
 }
 async function insertOneToYoutube(title,stream,description)
 {
-    
     await new Promise((resolve,reject)=>{
         service.videos.insert({
             auth: settings.client_token,
@@ -278,7 +266,7 @@ async function insertOneToYoutube(title,stream,description)
                 },
                 // I set to private for tests
                 status: {
-                    privacyStatus: settings.public?'public':'private'
+                    privacyStatus: settings.private?'private':'public'
                 }
             },
 
@@ -295,47 +283,23 @@ async function insertOneToYoutube(title,stream,description)
         })
     })
 }
-function urlToName(url)
+
+async function download(url)
 {
-    return  new URL(url).pathname.split("/").slice(-1)[0]
     
-}
-async function download(url,folder,filename=false,as_stream=true)
-{
-    const fpath =  path.join(folder||"",filename||urlToName(url));
-    
-    console.log("Downloading",url,"into",as_stream?"stream":fpath)
-    return await new Promise(resolve=>{
-        
-        (url.startsWith("https")?https:http).get(url, (res) => {
-            
-            //console.log(res,res.pipe,res.path)
-            if(as_stream){
-                
-                resolve(res); return;}
-                fs.mkdirSync(path.dirname(fpath),{recursive:true})
-                
-                const writeStream = fs.createWriteStream(fpath);
-                
-                res.pipe(writeStream);
-                
-                
-                writeStream.on("finish", () => {
-                    writeStream.close();
-                    console.log("Download Completed");
-                    resolve(fpath)
-                })
-            }).on('error', (e) => {
-                console.log("Error while downloading", url)
-                console.error(e);
-                resolve(fpath);
-            });
+    console.log("Downloading",url,"into stream")
+    return await new Promise((resolve,reject)=>{
+        (url.startsWith("https")?https:http).get(url, resolve).on('error', (e) => {
+            console.log("Error while downloading", url,"to stream")
+            reject(e);
         });
+    });
     }
 async function uploadOneToYouTube(post)
 {
     console.log("Reuploading",post.id)
     let videoStream = await download(post.postVideo.url)
+   
     await insertOneToYoutube(post.title,videoStream,"#Shorts")
     settings.persistent.lastUploadID=post.id
     saveSettings()
@@ -351,10 +315,11 @@ async function uploadAllToYoutube(posts)
     for (let index = 0; index < posts.length; index++) {
         let post = posts[index];
         try{        
+            
             await uploadOneToYouTube(post)
         }
         catch(e){
-            console.log("Upload ERROR")
+            console.log("Reupload ERROR")
             console.error(e.message)
             break;
         }

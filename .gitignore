@@ -1,0 +1,7 @@
+.vscode/
+node_modules/
+profile/
+client_secret.json
+package-lock.json
+postsCache.json
+settings.yaml

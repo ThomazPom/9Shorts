@@ -1,0 +1,26 @@
+{
+  
+  "type": "module",
+  
+  "dependencies": {
+  
+    
+  "googleapis": "^107.0.0",
+  
+    
+  "js-yaml": "^4.1.0",
+  
+    
+  "node-fetch": "^3.2.10",
+  
+    
+  "puppeteer": "^8.0.0",
+  
+    
+  "puppeteer-extra": "^3.3.4",
+  
+    
+  "puppeteer-extra-plugin-stealth": "^2.11.1"
+  
+  }
+}

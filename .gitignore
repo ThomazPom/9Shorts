@@ -5,3 +5,4 @@ client_secret.json
 package-lock.json
 postsCache.json
 settings.yaml
+*.png
